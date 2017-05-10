@@ -1,9 +1,8 @@
-﻿using System;
-using System.IO;
-using System.IO.Compression;
+﻿using System.Linq;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.GameContent.Tile_Entities;
+using Terraria.ID;
 using TShockAPI;
 using WorldEdit.Expressions;
 
@@ -11,94 +10,105 @@ namespace WorldEdit.Commands
 {
 	public class Paste : WECommand
 	{
-		private int alignment;
-		private Expression expression;
-		private bool mode_MainBlocks;
+		private readonly int alignment;
+		private readonly Expression expression;
 
-		public Paste(int x, int y, TSPlayer plr, int alignment, Expression expression, bool mode_MainBlocks)
-			: base(x, y, Int32.MaxValue, Int32.MaxValue, plr)
+		public Paste(int x, int y, TSPlayer plr, int alignment, Expression expression)
+			: base(x, y, int.MaxValue, int.MaxValue, plr)
 		{
 			this.alignment = alignment;
 			this.expression = expression;
-			this.mode_MainBlocks = mode_MainBlocks;
 		}
 
 		public override void Execute()
 		{
-			string clipboardPath = Tools.GetClipboardPath(plr.User.ID);
+			var clipboardPath = Tools.GetClipboardPath(plr.User.ID);
 
-			using (var reader = new BinaryReader(new GZipStream(new FileStream(clipboardPath, FileMode.Open), CompressionMode.Decompress)))
+			var data = Tools.LoadWorldData(clipboardPath);
+
+			var width = data.Width - 1;
+			var height = data.Height - 1;
+
+			if ((alignment & 1) == 0)
+				x2 = x + width;
+			else
 			{
-				reader.ReadInt32();
-				reader.ReadInt32();
+				x2 = x;
+				x -= width;
+			}
+			if ((alignment & 2) == 0)
+				y2 = y + height;
+			else
+			{
+				y2 = y;
+				y -= height;
+			}
 
-				int width = reader.ReadInt32() - 1;
-				int height = reader.ReadInt32() - 1;
+			Tools.PrepareUndo(x, y, x2, y2, plr);
 
-				if ((alignment & 1) == 0)
-					x2 = x + width;
-				else
+			for (var i = x; i <= x2; i++)
+			{
+				for (var j = y; j <= y2; j++)
 				{
-					x2 = x;
-					x -= width;
-				}
-				if ((alignment & 2) == 0)
-					y2 = y + height;
-				else
-				{
-					y2 = y;
-					y -= height;
-				}
-
-				Tools.PrepareUndo(x, y, x2, y2, plr);
-
-				for (int i = x; i <= x2; i++)
-				{
-					for (int j = y; j <= y2; j++)
+					if (i < 0 || j < 0 || i >= Main.maxTilesX || j >= Main.maxTilesY ||
+						expression != null && !expression.Evaluate(Main.tile[i, j]))
 					{
-						var Tile = reader.ReadTile();
-						if (i >= 0 && j >= 0 && i < Main.maxTilesX && j < Main.maxTilesY && (expression == null || expression.Evaluate((mode_MainBlocks) ? Main.tile[i, j] : Tile.Item1)))
+						continue;
+					}
+
+					var index1 = i - x;
+					var index2 = j - y;
+
+					Main.tile[i, j] = data.Tiles[index1, index2];
+
+					if (data.Signs.Count(s => s.X == index1 && s.Y == index2) != 0)
+					{
+						var sign = data.Signs.First(s => s.X == index1 && s.Y == index2);
+						var id = Sign.ReadSign(i, j);
+						if (id != -1)
 						{
-							if ((Tile.Item2 != null) || (Tile.Item3 != null)
-							|| (Tile.Item4 != null))
+							Sign.TextSign(id, sign.Text);
+						}
+					}
+					else if (data.ItemFrames.Count(s => s.X == index1 && s.Y == index2) != 0)
+					{
+						var itemFrame = data.ItemFrames.First(s => s.X == index1 && s.Y == index2);
+
+						var id = TEItemFrame.Place(i, j);
+						if (id != -1)
+						{
+							WorldGen.PlaceObject(i, j, TileID.ItemFrame);
+							var frame = (TEItemFrame)TileEntity.ByID[id];
+
+							frame.item = new Item();
+							frame.item.netDefaults(itemFrame.Item.NetId);
+							frame.item.stack = itemFrame.Item.Stack;
+							frame.item.prefix = itemFrame.Item.PrefixId;
+						}
+					}
+					else if (data.Chests.Count(s => s.X == index1 && s.Y == index2) != 0)
+					{
+						var chest = data.Chests.First(s => s.X == index1 && s.Y == index2);
+
+						var id = Chest.CreateChest(i, j);
+						if (id != -1)
+						{
+							WorldGen.PlaceChest(i, j);
+							for (var index = 0; index < chest.Items.Length; index++)
 							{
-								Main.tile[i, j] = new Tile();
-								Main.tile[i + 1, j] = new Tile();
-								Main.tile[i, j + 1] = new Tile();
-								Main.tile[i + 1, j + 1] = new Tile();
-							}
-							Main.tile[i, j] = Tile.Item1;
-							if (Tile.Item2 != null)
-							{
-								int SignID = Sign.ReadSign(i, j);
-								string Text = Tile.Item2;
-								if (SignID != -1)
-								{ Sign.TextSign(SignID, Text); }
-							}
-							if (Tile.Item3 != null)
-							{
-								int FrameID = TEItemFrame.Place(i, j);
-								if (FrameID != -1)
-								{
-									WorldGen.PlaceObject(i, j, Terraria.ID.TileID.ItemFrame);
-									TEItemFrame frame = (TEItemFrame)TileEntity.ByID[FrameID];
-									frame.item = Tile.Item3;
-								}
-							}
-							if (Tile.Item4 != null)
-							{
-								int ChestID = Chest.CreateChest(i, j);
-								if (ChestID != -1)
-								{
-									WorldGen.PlaceChest(i, j);
-									for (int a = 0; a < 40; a++)
-									{ Main.chest[ChestID].item[a] = Tile.Item4[a]; }
-								}
+								var netItem = chest.Items[index];
+								var item = new Item();
+								item.netDefaults(netItem.NetId);
+								item.stack = netItem.Stack;
+								item.prefix = netItem.PrefixId;
+								Main.chest[id].item[index] = item;
+
 							}
 						}
 					}
 				}
 			}
+
 			ResetSection();
 			plr.SendSuccessMessage("Pasted clipboard to selection.");
 		}

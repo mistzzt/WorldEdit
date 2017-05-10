@@ -9,27 +9,24 @@ using TShockAPI;
 using TShockAPI.DB;
 using Terraria.GameContent.Tile_Entities;
 using Terraria.DataStructures;
+using Terraria.ID;
 
 namespace WorldEdit
 {
 	public static class Tools
 	{
-		private const int BUFFER_SIZE = 1048576;
+		internal const int BUFFER_SIZE = 1048576;
 		private const int MAX_UNDOS = 50;
+
+		private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
 		public static string GetClipboardPath(int accountID)
 		{
-			return Path.Combine("worldedit", String.Format("clipboard-{0}.dat", accountID));
+			return Path.Combine("worldedit", string.Format("clipboard-{0}.dat", accountID));
 		}
-		public static bool CorrectName(string Name)
+		public static bool IsCorrectName(string name)
 		{
-			char[] Invalid = Path.GetInvalidFileNameChars();
-			foreach (char c in Name)
-			{
-				if (Invalid.Contains(c))
-				{ return false; }
-			}
-			return true;
+			return name.All(c => !InvalidFileNameChars.Contains(c));
 		}
 		public static List<int> GetColorID(string color)
 		{
@@ -89,38 +86,127 @@ namespace WorldEdit
 
 			return Slope;
 		}
+
 		public static bool HasClipboard(int accountID)
 		{
-			return File.Exists(Path.Combine("worldedit", String.Format("clipboard-{0}.dat", accountID)));
+			return File.Exists(Path.Combine("worldedit", string.Format("clipboard-{0}.dat", accountID)));
 		}
-		public static Tuple<Tile, string, Item, Item[]>[,] LoadWorldDataNew(string path)
+
+		#region LoadWorldSectionData
+
+		public static WorldSectionData LoadWorldData(string path)
 		{
-			Tuple<Tile, string, Item, Item[]>[,] tile;
-			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
 			using (var reader =
 				new BinaryReader(
 					new BufferedStream(
 						new GZipStream(File.Open(path, FileMode.Open), CompressionMode.Decompress), BUFFER_SIZE)))
 			{
-				reader.ReadInt32();
-				reader.ReadInt32();
-				int width = reader.ReadInt32();
-				int height = reader.ReadInt32();
-				tile = new Tuple<Tile, string, Item, Item[]>[width, height];
+				var x = reader.ReadInt32();
+				var y = reader.ReadInt32();
+				var width = reader.ReadInt32();
+				var height = reader.ReadInt32();
+				var worldData = new WorldSectionData(width, height) { X = x, Y = y };
 
-				for (int i = 0; i < width; i++)
+				for (var i = 0; i < width; i++)
 				{
-					for (int j = 0; j < height; j++)
-						tile[i, j] = ReadTile(reader);
+					for (var j = 0; j < height; j++)
+						worldData.Tiles[i, j] = reader.ReadTile();
 				}
-				return tile;
+
+				var signCount = reader.ReadInt32();
+				worldData.Signs = new WorldSectionData.SignData[signCount];
+				for (var i = 0; i < signCount; i++)
+				{
+					worldData.Signs[i] = reader.ReadSign();
+				}
+
+				var chestCount = reader.ReadInt32();
+				worldData.Chests = new WorldSectionData.ChestData[chestCount];
+				for (var i = 0; i < chestCount; i++)
+				{
+					worldData.Chests[i] = reader.ReadChest();
+				}
+
+				var itemFrameCount = reader.ReadInt32();
+				worldData.ItemFrames = new WorldSectionData.ItemFrameData[itemFrameCount];
+				for (var i = 0; i < itemFrameCount; i++)
+				{
+					worldData.ItemFrames[i] = reader.ReadItemFrame();
+				}
+
+				return worldData;
 			}
 		}
-		public static Tuple<Tile, string, Item, Item[]> TileData(Tile Tile, string Sign = null, Item ItemFrame = null, Item[] Chest = null)
-		{ return new Tuple<Tile, string, Item, Item[]>(Tile, Sign, ItemFrame, Chest); }
-		private static Tile[,] LoadWorldDataOld(string path)
+
+		private static Tile ReadTile(this BinaryReader reader)
 		{
-			Tile[,] tile;
+			var tile = new Tile
+			{
+				sTileHeader = reader.ReadInt16(),
+				bTileHeader = reader.ReadByte(),
+				bTileHeader2 = reader.ReadByte()
+			};
+
+			// Tile type
+			if (tile.active())
+			{
+				tile.type = reader.ReadUInt16();
+				if (Main.tileFrameImportant[tile.type])
+				{
+					tile.frameX = reader.ReadInt16();
+					tile.frameY = reader.ReadInt16();
+				}
+			}
+			tile.wall = reader.ReadByte();
+			tile.liquid = reader.ReadByte();
+			return tile;
+		}
+
+		private static WorldSectionData.SignData ReadSign(this BinaryReader reader)
+		{
+			return new WorldSectionData.SignData
+			{
+				X = reader.ReadInt32(),
+				Y = reader.ReadInt32(),
+				Text = reader.ReadString()
+			};
+		}
+
+		private static WorldSectionData.ChestData ReadChest(this BinaryReader reader)
+		{
+			var x = reader.ReadInt32();
+			var y = reader.ReadInt32();
+
+			var count = reader.ReadInt32();
+			var items = new NetItem[count];
+
+			for (var i = 0; i < count; i++)
+			{
+				items[i] = new NetItem(reader.ReadInt32(), reader.ReadInt32(), reader.ReadByte());
+			}
+
+			return new WorldSectionData.ChestData
+			{
+				Items = items,
+				X = x,
+				Y = y
+			};
+		}
+
+		private static WorldSectionData.ItemFrameData ReadItemFrame(this BinaryReader reader)
+		{
+			return new WorldSectionData.ItemFrameData
+			{
+				X = reader.ReadInt32(),
+				Y = reader.ReadInt32(),
+				Item = new NetItem(reader.ReadInt32(), reader.ReadInt32(), reader.ReadByte())
+			};
+		}
+
+		#endregion
+
+		public static Tile[,] LoadWorldDataOld(string path)
+		{
 			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
 			using (var reader =
 				new BinaryReader(
@@ -129,83 +215,91 @@ namespace WorldEdit
 			{
 				reader.ReadInt32();
 				reader.ReadInt32();
-				int width = reader.ReadInt32();
-				int height = reader.ReadInt32();
-				tile = new Tile[width, height];
+				var width = reader.ReadInt32();
+				var height = reader.ReadInt32();
+				var tile = new Tile[width, height];
 
-				for (int i = 0; i < width; i++)
+				for (var i = 0; i < width; i++)
 				{
-					for (int j = 0; j < height; j++)
+					for (var j = 0; j < height; j++)
 					{
-						tile[i, j] = ReadTileOld(reader);
+						tile[i, j] = reader.ReadTile();
 					}
 				}
 
 				return tile;
 			}
 		}
+
 		public static void LoadWorldSection(string path)
 		{
-			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
-			using (var reader =
-				new BinaryReader(
-					new BufferedStream(
-						new GZipStream(File.Open(path, FileMode.Open), CompressionMode.Decompress), BUFFER_SIZE)))
-			{
-				int x = reader.ReadInt32();
-				int y = reader.ReadInt32();
-				int width = reader.ReadInt32();
-				int height = reader.ReadInt32();
+			var data = LoadWorldData(path);
 
-				for (int i = x; i < x + width; i++)
+			for (var i = 0; i < data.Width; i++)
+			{
+				for (var j = 0; j < data.Height; j++)
 				{
-					for (int j = y; j < y + height; j++)
-					{
-						var Tile = reader.ReadTile();
-						if ((Tile.Item2 != null) || (Tile.Item3 != null)
-							|| (Tile.Item4 != null))
-						{
-							Main.tile[i, j] = new Tile();
-							Main.tile[i + 1, j] = new Tile();
-							Main.tile[i, j + 1] = new Tile();
-							Main.tile[i + 1, j + 1] = new Tile();
-						}
-						Main.tile[i, j] = Tile.Item1;
-						Main.tile[i, j].skipLiquid(true);
-						if (Tile.Item2 != null)
-						{
-							int SignID = Sign.ReadSign(i, j);
-							string Text = Tile.Item2;
-							if (SignID != -1)
-							{ Sign.TextSign(SignID, Text); }
-						}
-						if (Tile.Item3 != null)
-						{
-							int FrameID = TEItemFrame.Place(i, j);
-							if (FrameID != -1)
-							{
-								WorldGen.PlaceObject(i, j, Terraria.ID.TileID.ItemFrame);
-								TEItemFrame frame = (TEItemFrame)TileEntity.ByID[FrameID];
-								frame.item = Tile.Item3;
-							}
-						}
-						else if (Tile.Item4 != null)
-						{
-							int ChestID = Chest.CreateChest(i, j);
-							if (ChestID != -1)
-							{
-								WorldGen.PlaceChest(i, j);
-								for (int a = 0; a < 40; a++)
-								{
-									Main.chest[ChestID].item[a] = Tile.Item4[a];
-								}
-							}
-						}
-					}
+					Main.tile[i + data.X, j + data.Y] = data.Tiles[i, j];
+					Main.tile[i + data.X, j + data.Y].skipLiquid(true);
 				}
-				ResetSection(x, y, x + width, y + height);
 			}
+
+			foreach (var sign in data.Signs)
+			{
+				var id = Sign.ReadSign(sign.X + data.X, sign.Y + data.Y);
+				if (id == -1)
+				{
+					continue;
+				}
+
+				Sign.TextSign(id, sign.Text);
+			}
+
+			foreach (var itemFrame in data.ItemFrames)
+			{
+				var x = itemFrame.X + data.X;
+				var y = itemFrame.Y + data.Y;
+
+				var id = TEItemFrame.Place(x, y);
+				if (id == -1)
+				{
+					continue;
+				}
+
+				WorldGen.PlaceObject(x, y, TileID.ItemFrame);
+				var frame = (TEItemFrame) TileEntity.ByID[id];
+
+				frame.item = new Item();
+				frame.item.netDefaults(itemFrame.Item.NetId);
+				frame.item.stack = itemFrame.Item.Stack;
+				frame.item.prefix = itemFrame.Item.PrefixId;
+			}
+
+			foreach (var chest in data.Chests)
+			{
+				int x = chest.X + data.X, y = chest.Y + data.Y;
+
+				var id = Chest.CreateChest(x, y);
+				if (id == -1)
+				{
+					continue;
+				}
+
+				WorldGen.PlaceChest(x, y);
+				for (var index = 0; index < chest.Items.Length; index++)
+				{
+					var netItem = chest.Items[index];
+					var item = new Item();
+					item.netDefaults(netItem.NetId);
+					item.stack = netItem.Stack;
+					item.prefix = netItem.PrefixId;
+					Main.chest[id].item[index] = item;
+
+				}
+			}
+			ResetSection(data.X, data.Y, data.X + data.Width, data.Y + data.Height);
 		}
+
 		public static void PrepareUndo(int x, int y, int x2, int y2, TSPlayer plr)
 		{
 			if (WorldEdit.Database.GetSqlType() == SqlType.Mysql)
@@ -222,95 +316,14 @@ namespace WorldEdit
 					undoLevel = reader.Get<int>("UndoLevel");
 			}
 
-			string path = Path.Combine("worldedit", String.Format("undo-{0}-{1}.dat", plr.User.ID, undoLevel));
+			string path = Path.Combine("worldedit", string.Format("undo-{0}-{1}.dat", plr.User.ID, undoLevel));
 			SaveWorldSection(x, y, x2, y2, path);
 
-			foreach (string fileName in Directory.EnumerateFiles("worldedit", String.Format("redo-{0}-*.dat", plr.User.ID)))
+			foreach (string fileName in Directory.EnumerateFiles("worldedit", string.Format("redo-{0}-*.dat", plr.User.ID)))
 				File.Delete(fileName);
-			File.Delete(Path.Combine("worldedit", String.Format("undo-{0}-{1}.dat", plr.User.ID, undoLevel - MAX_UNDOS)));
+			File.Delete(Path.Combine("worldedit", string.Format("undo-{0}-{1}.dat", plr.User.ID, undoLevel - MAX_UNDOS)));
 		}
-		public static Tuple<Tile, string, Item, Item[]> ReadTile(this BinaryReader reader)
-		{
-			Tile tile = new Tile();
-			string sign = null;
-			Item item = null;
-			Item[] items = null;
-			tile.sTileHeader = reader.ReadInt16();
-			tile.bTileHeader = reader.ReadByte();
-			tile.bTileHeader2 = reader.ReadByte();
-			// Tile type
-			if (tile.active())
-			{
-				tile.type = reader.ReadUInt16();
-				if (Main.tileFrameImportant[tile.type])
-				{
-					tile.frameX = reader.ReadInt16();
-					tile.frameY = reader.ReadInt16();
-				}
-			}
-			tile.wall = reader.ReadByte();
-			tile.liquid = reader.ReadByte();
-			
-			if ((tile.type == Terraria.ID.TileID.Signs)
-				|| (tile.type == Terraria.ID.TileID.AnnouncementBox)
-				|| (tile.type == Terraria.ID.TileID.Tombstones))
-			{
-				int signID = reader.ReadInt32();
-				if (signID != -1)
-				{
-					sign = reader.ReadString();
-				}
-			}
-			else if (tile.type == Terraria.ID.TileID.ItemFrame)
-			{
-				int frameID = reader.ReadInt32();
-				if (frameID != -1)
-				{
-					item = new Item();
-					item.netDefaults(reader.ReadInt32());
-					item.prefix = reader.ReadByte();
-				}
-			}
-			else if ((tile.type == Terraria.ID.TileID.Containers)
-				|| (tile.type == Terraria.ID.TileID.Dressers))
-			{
-				int chestID = reader.ReadInt32();
-				if (chestID != -1)
-				{
-					int Length = reader.ReadInt32();
-					items = new Item[Length];
-					for (int i = 0; i < Length; i++)
-					{
-						items[i] = new Item();
-						items[i].netDefaults(reader.ReadInt32());
-						items[i].stack = reader.ReadInt32();
-						items[i].prefix = reader.ReadByte();
-					}
-				}
-			}
-			return TileData(tile, sign, item, items);
-		}
-		private static Tile ReadTileOld(this BinaryReader reader)
-		{
-			Tile tile = new Tile();
-			tile.sTileHeader = reader.ReadInt16();
-			tile.bTileHeader = reader.ReadByte();
-			tile.bTileHeader2 = reader.ReadByte();
 
-			// Tile type
-			if (tile.active())
-			{
-				tile.type = reader.ReadUInt16();
-				if (Main.tileFrameImportant[tile.type])
-				{
-					tile.frameX = reader.ReadInt16();
-					tile.frameY = reader.ReadInt16();
-				}
-			}
-			tile.wall = reader.ReadByte();
-			tile.liquid = reader.ReadByte();
-			return tile;
-		}
 		public static bool Redo(int accountID)
 		{
 			int redoLevel = 0;
@@ -329,13 +342,13 @@ namespace WorldEdit
 			if (redoLevel < -1)
 				return false;
 
-			string redoPath = Path.Combine("worldedit", String.Format("redo-{0}-{1}.dat", accountID, redoLevel + 1));
+			string redoPath = Path.Combine("worldedit", string.Format("redo-{0}-{1}.dat", accountID, redoLevel + 1));
 			WorldEdit.Database.Query("UPDATE WorldEdit SET RedoLevel = @0 WHERE Account = @1", redoLevel, accountID);
 
 			if (!File.Exists(redoPath))
 				return false;
 
-			string undoPath = Path.Combine("worldedit", String.Format("undo-{0}-{1}.dat", accountID, undoLevel));
+			string undoPath = Path.Combine("worldedit", string.Format("undo-{0}-{1}.dat", accountID, undoLevel));
 			WorldEdit.Database.Query("UPDATE WorldEdit SET UndoLevel = @0 WHERE Account = @1", undoLevel, accountID);
 
 			using (var reader = new BinaryReader(new GZipStream(new FileStream(redoPath, FileMode.Open), CompressionMode.Decompress)))
@@ -350,6 +363,7 @@ namespace WorldEdit
 			File.Delete(redoPath);
 			return true;
 		}
+
 		public static void ResetSection(int x, int y, int x2, int y2)
 		{
 			int lowX = Netplay.GetSectionX(x);
@@ -365,174 +379,21 @@ namespace WorldEdit
 				}
 			}
 		}
+
 		public static void SaveWorldSection(int x, int y, int x2, int y2, string path)
 		{
-			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
 			using (var writer =
 				new BinaryWriter(
 					new BufferedStream(
 						new GZipStream(File.Open(path, FileMode.Create), CompressionMode.Compress), BUFFER_SIZE)))
 			{
-				writer.Write(x);
-				writer.Write(y);
-				writer.Write(x2 - x + 1);
-				writer.Write(y2 - y + 1);
+				var data = SaveWorldSection(x, y, x2, y2);
 
-				for (int i = x; i <= x2; i++)
-				{
-					for (int j = y; j <= y2; j++)
-						writer.Write((Main.tile[i, j] ?? new Tile()), i, j);
-				}
+				data.Write(writer);
 			}
 		}
-		public static void Write(this BinaryWriter writer, ITile tile, int X, int Y)
-		{
-			writer.Write(tile.sTileHeader);
-			writer.Write(tile.bTileHeader);
-			writer.Write(tile.bTileHeader2);
 
-			if (tile.active())
-			{
-				writer.Write(tile.type);
-				if (Main.tileFrameImportant[tile.type])
-				{
-					writer.Write(tile.frameX);
-					writer.Write(tile.frameY);
-				}
-			}
-			writer.Write(tile.wall);
-			writer.Write(tile.liquid);
-			if (tile.active())
-			{
-				if ((tile.type == Terraria.ID.TileID.Signs)
-					|| (tile.type == Terraria.ID.TileID.AnnouncementBox)
-					|| (tile.type == Terraria.ID.TileID.Tombstones))
-				{
-					if (((tile.frameX % 36) == 0) && (tile.frameY == 0))
-					{
-						int SignID = Sign.ReadSign(X, Y, false);
-						writer.Write(SignID);
-						if (SignID != -1)
-						{
-							Sign Sign = Main.sign[SignID];
-							writer.Write(Sign.text);
-						}
-					}
-					else { writer.Write(-1); }
-				}
-				else if (tile.type == Terraria.ID.TileID.ItemFrame)
-				{
-					if (((tile.frameX % 36) == 0) && (tile.frameY == 0))
-					{
-						int FrameID = TEItemFrame.Find(X, Y);
-						writer.Write(FrameID);
-						if (FrameID != -1)
-						{
-							TEItemFrame Frame = (TEItemFrame)TileEntity.ByID[FrameID];
-							writer.Write(Frame.item.netID);
-							writer.Write(Frame.item.prefix);
-						}
-					}
-					else { writer.Write(-1); }
-				}
-				else if ((tile.type == Terraria.ID.TileID.Containers)
-					|| (tile.type == Terraria.ID.TileID.Dressers))
-				{
-					if (((tile.frameX % 36) == 0) && (tile.frameY == 0))
-					{
-						int ChestID = Chest.FindChest(X, Y);
-						writer.Write(ChestID);
-						if (ChestID != -1)
-						{
-							Chest Chest = Main.chest[ChestID];
-							writer.Write((Chest.item == null) ? 0 : Chest.item.Length);
-							if (Chest.item != null)
-							{
-								foreach (Item i in Chest.item)
-								{
-									if (i == null)
-									{
-										writer.Write(new Item().netID);
-										writer.Write(new Item().stack);
-										writer.Write(new Item().prefix);
-									}
-									else
-									{
-										writer.Write(i.netID);
-										writer.Write(i.stack);
-										writer.Write(i.prefix);
-									}
-								}
-							}
-						}
-					}
-					else { writer.Write(-1); }
-				}
-			}
-		}
-		public static void Write(this BinaryWriter writer, Tuple<Tile, string, Item, Item[]> tile)
-		{
-			writer.Write(tile.Item1.sTileHeader);
-			writer.Write(tile.Item1.bTileHeader);
-			writer.Write(tile.Item1.bTileHeader2);
-
-			if (tile.Item1.active())
-			{
-				writer.Write(tile.Item1.type);
-				if (Main.tileFrameImportant[tile.Item1.type])
-				{
-					writer.Write(tile.Item1.frameX);
-					writer.Write(tile.Item1.frameY);
-				}
-			}
-			writer.Write(tile.Item1.wall);
-			writer.Write(tile.Item1.liquid);
-			if ((tile.Item1.type == Terraria.ID.TileID.Signs)
-				|| (tile.Item1.type == Terraria.ID.TileID.AnnouncementBox)
-				|| (tile.Item1.type == Terraria.ID.TileID.Tombstones))
-			{
-				if ((tile.Item1.frameX == 0) && (tile.Item1.frameY == 0))
-				{
-					if (tile.Item2 != null)
-					{ writer.Write(tile.Item2); }
-					else { writer.Write(-1); }
-				}
-				else { writer.Write(-1); }
-			}
-			else if (tile.Item1.type == Terraria.ID.TileID.ItemFrame)
-			{
-				if ((tile.Item1.frameX == 0) && (tile.Item1.frameY == 0))
-				{
-					if (tile.Item3 != null)
-					{
-						writer.Write(tile.Item3.netID);
-						writer.Write(tile.Item3.prefix);
-					}
-					else { writer.Write(-1); }
-				}
-				else { writer.Write(-1); }
-			}
-			else if ((tile.Item1.type == Terraria.ID.TileID.Containers)
-				|| (tile.Item1.type == Terraria.ID.TileID.Dressers))
-			{
-				if ((tile.Item1.frameX == 0) && (tile.Item1.frameY == 0))
-				{
-					if (tile.Item4 != null)
-					{
-						writer.Write(40);
-						foreach (Item i in tile.Item4)
-						{
-							writer.Write(i.netID);
-							writer.Write(i.stack);
-							writer.Write(i.prefix);
-						}
-					}
-					else { writer.Write(-1); }
-				}
-				else { writer.Write(-1); }
-			}
-		}
-		private static void WriteTileOld(this BinaryWriter writer, ITile tile)
+		public static void Write(this BinaryWriter writer, ITile tile)
 		{
 			writer.Write(tile.sTileHeader);
 			writer.Write(tile.bTileHeader);
@@ -550,35 +411,35 @@ namespace WorldEdit
 			writer.Write(tile.wall);
 			writer.Write(tile.liquid);
 		}
-		public static void Convert(string file)
+
+		public static WorldSectionData SaveWorldSection(int x, int y, int x2, int y2)
 		{
-			string newfile = file.Substring(0, (file.LastIndexOf('\\') + 1)) + "schematic-new-" + file.Substring(file.LastIndexOf('\\') + 11);
-			if (File.Exists(newfile)) File.Delete(newfile);
+			var width = x2 - x + 1;
+			var height = y2 - y + 1;
 
-			var tile = LoadWorldDataOld(file);
-
-			using (var writer =
-					new BinaryWriter(
-						new BufferedStream(
-							new GZipStream(File.Open(file, FileMode.Create), CompressionMode.Compress), BUFFER_SIZE)))
+			var data = new WorldSectionData(width, height)
 			{
-				writer.Write(0);
-				writer.Write(0);
-				writer.Write(tile.GetLength(0));
-				writer.Write(tile.GetLength(1));
-				for (int i = 0; i < tile.GetLength(0); i++)
+				X = x,
+				Y = y,
+				Chests = new List<WorldSectionData.ChestData>(),
+				Signs = new List<WorldSectionData.SignData>(),
+				ItemFrames = new List<WorldSectionData.ItemFrameData>()
+			};
+
+			for (var i = x; i <= x2; i++)
+			{
+				for (var j = y; j <= y2; j++)
 				{
-					for (int j = 0; j < tile.GetLength(1); j++)
-					{ writer.Write(TileData(tile[i, j])); }
+					data.ProcessTile(Main.tile[i, j], i - x, j - y);
 				}
 			}
 
-			File.Move(file, newfile);
+			return data;
 		}
+
 		public static bool Undo(int accountID)
 		{
-			int redoLevel = 0;
-			int undoLevel = 0;
+			int redoLevel, undoLevel;
 			using (var reader = WorldEdit.Database.QueryReader("SELECT RedoLevel, UndoLevel FROM WorldEdit WHERE Account = @0", accountID))
 			{
 				if (reader.Read())
@@ -593,13 +454,13 @@ namespace WorldEdit
 			if (undoLevel < -1)
 				return false;
 
-			string undoPath = Path.Combine("worldedit", String.Format("undo-{0}-{1}.dat", accountID, undoLevel + 1));
+			string undoPath = Path.Combine("worldedit", string.Format("undo-{0}-{1}.dat", accountID, undoLevel + 1));
 			WorldEdit.Database.Query("UPDATE WorldEdit SET UndoLevel = @0 WHERE Account = @1", undoLevel, accountID);
 
 			if (!File.Exists(undoPath))
 				return false;
 
-			string redoPath = Path.Combine("worldedit", String.Format("redo-{0}-{1}.dat", accountID, redoLevel));
+			string redoPath = Path.Combine("worldedit", string.Format("redo-{0}-{1}.dat", accountID, redoLevel));
 			WorldEdit.Database.Query("UPDATE WorldEdit SET RedoLevel = @0 WHERE Account = @1", redoLevel, accountID);
 
 			using (var reader = new BinaryReader(new GZipStream(new FileStream(undoPath, FileMode.Open), CompressionMode.Decompress)))

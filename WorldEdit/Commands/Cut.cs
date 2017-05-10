@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using System.IO.Compression;
+﻿using System.IO;
 using Terraria;
 using TShockAPI;
 using TShockAPI.DB;
@@ -9,8 +7,6 @@ namespace WorldEdit.Commands
 {
 	public class Cut : WECommand
 	{
-		private const int BUFFER_SIZE = 1048576;
-
 		public Cut(int x, int y, int x2, int y2, TSPlayer plr)
 			: base(x, y, x2, y2, plr)
 		{
@@ -18,7 +14,7 @@ namespace WorldEdit.Commands
 
 		public override void Execute()
 		{
-			foreach (string fileName in Directory.EnumerateFiles("worldedit", String.Format("redo-{0}-*.dat", plr.User.ID)))
+			foreach (string fileName in Directory.EnumerateFiles("worldedit", string.Format("redo-{0}-*.dat", plr.User.ID)))
 				File.Delete(fileName);
 
 			if (WorldEdit.Database.GetSqlType() == SqlType.Mysql)
@@ -37,44 +33,40 @@ namespace WorldEdit.Commands
 			
 			string clipboard = Tools.GetClipboardPath(plr.User.ID);
 
-			string undoPath = Path.Combine("worldedit", String.Format("undo-{0}-{1}.dat", plr.User.ID, undoLevel));
-			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
-			using (var writer =
-				new BinaryWriter(
-					new BufferedStream(
-						new GZipStream(File.Open(undoPath, FileMode.Create), CompressionMode.Compress), BUFFER_SIZE)))
-			{
-				writer.Write(x);
-				writer.Write(y);
-				writer.Write(x2 - x + 1);
-				writer.Write(y2 - y + 1);
+			string undoPath = Path.Combine("worldedit", string.Format("undo-{0}-{1}.dat", plr.User.ID, undoLevel));
 
-				for (int i = x; i <= x2; i++)
+			Tools.SaveWorldSection(x, y, x2, y2, undoPath);
+
+			for (int i = x; i <= x2; i++)
+			{
+				for (int j = y; j <= y2; j++)
 				{
-					for (int j = y; j <= y2; j++)
+					var tile = Main.tile[i, j];
+					switch (tile.type)
 					{
-						writer.Write(Main.tile[i, j], i, j);
-						var tile = Main.tile[i, j];
-						if (((tile.type == Terraria.ID.TileID.Signs)
-							|| (tile.type == Terraria.ID.TileID.Tombstones)
-							|| (tile.type == Terraria.ID.TileID.AnnouncementBox)
-							|| (tile.type == Terraria.ID.TileID.Containers)
-							|| (tile.type == Terraria.ID.TileID.Dressers)
-							|| (tile.type == Terraria.ID.TileID.ItemFrame))
-							&& ((tile.frameX % 36 == 0) && (tile.frameY == 0)))
-						{
-							if ((tile.type == Terraria.ID.TileID.Signs)
-								|| (tile.type == Terraria.ID.TileID.Tombstones)
-								|| (tile.type == Terraria.ID.TileID.AnnouncementBox))
-							{ Sign.KillSign(i, j); }
-							if ((tile.type == Terraria.ID.TileID.Containers)
-								|| (tile.type == Terraria.ID.TileID.Dressers))
-							{ Chest.DestroyChest(i, j); }
-							if (tile.type == Terraria.ID.TileID.ItemFrame)
-							{ Terraria.GameContent.Tile_Entities.TEItemFrame.Kill(i, j); }
-						}
-						Main.tile[i, j] = new Tile();
+						case Terraria.ID.TileID.Signs:
+						case Terraria.ID.TileID.Tombstones:
+						case Terraria.ID.TileID.AnnouncementBox:
+							if (tile.frameX % 36 == 0 && tile.frameY == 0)
+							{
+								Sign.KillSign(i, j);
+							}
+							break;
+						case Terraria.ID.TileID.Containers:
+						case Terraria.ID.TileID.Dressers:
+							if (tile.frameX % 36 == 0 && tile.frameY == 0)
+							{
+								Chest.DestroyChest(i, j);
+							}
+							break;
+						case Terraria.ID.TileID.ItemFrame:
+							if (tile.frameX % 36 == 0 && tile.frameY == 0)
+							{
+								Terraria.GameContent.Tile_Entities.TEItemFrame.Kill(i, j);
+							}
+							break;
 					}
+					Main.tile[i, j] = new Tile();
 				}
 			}
 

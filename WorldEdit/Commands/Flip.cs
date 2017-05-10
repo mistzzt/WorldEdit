@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using System.IO.Compression;
+﻿using OTAPI.Tile;
 using Terraria;
 using TShockAPI;
 
@@ -8,9 +6,8 @@ namespace WorldEdit.Commands
 {
 	public class Flip : WECommand
 	{
-		private const int BUFFER_SIZE = 1048576;
-		private bool flipX;
-		private bool flipY;
+		private readonly bool flipX;
+		private readonly bool flipY;
 
 		public Flip(TSPlayer plr, bool flipX, bool flipY)
 			: base(0, 0, 0, 0, plr)
@@ -22,76 +19,64 @@ namespace WorldEdit.Commands
 		public override void Execute()
 		{
 			string clipboardPath = Tools.GetClipboardPath(plr.User.ID);
-			
-			Tuple<Tile, string, Item, Item[]>[,] tiles = Tools.LoadWorldDataNew(clipboardPath);
 
-			int width = tiles.GetLength(0);
-			int height = tiles.GetLength(1);
-			int endX = flipX ? -1 : width;
-			int endY = flipY ? -1 : height;
+			var data = Tools.LoadWorldData(clipboardPath);
+
+			int endX = flipX ? -1 : data.Width;
+			int endY = flipY ? -1 : data.Height;
 			int incX = flipX ? -1 : 1;
 			int incY = flipY ? -1 : 1;
 
-			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
-			using (var writer =
-				new BinaryWriter(
-					new BufferedStream(
-						new GZipStream(File.Open(clipboardPath, FileMode.Create), CompressionMode.Compress), BUFFER_SIZE)))
+			using (var writer = WorldSectionData.WriteHeader(clipboardPath, 0, 0, data.Width, data.Height))
 			{
-				writer.Write(0);
-				writer.Write(0);
-				writer.Write(width);
-				writer.Write(height);
-
-				// TODO: don't flip furniture
-				for (int i = flipX ? width - 1 : 0; i != endX; i += incX)
+				for (int i = flipX ? data.Width - 1 : 0; i != endX; i += incX)
 				{
-					for (int j = flipY ? height - 1 : 0; j != endY; j += incY)
+					for (int j = flipY ? data.Height - 1 : 0; j != endY; j += incY)
 					{
-						if (tiles[i, j].Item1.slope() == 0)
-							writer.Write(Tools.TileData(tiles[i, j].Item1));
-						else if (tiles[i, j].Item1.slope() == 1)
+						switch (data.Tiles[i, j].slope())
 						{
-							if (flipX && flipY)
-								tiles[i, j].Item1.slope(4);
-							else if (flipX)
-								tiles[i, j].Item1.slope(2);
-							else if (flipY)
-								tiles[i, j].Item1.slope(3);
-							writer.Write(Tools.TileData(tiles[i, j].Item1));
+							case 0:
+								break;
+							case 1:
+								if (flipX && flipY)
+									data.Tiles[i, j].slope(4);
+								else if (flipX)
+									data.Tiles[i, j].slope(2);
+								else if (flipY)
+									data.Tiles[i, j].slope(3);
+								break;
+							case 2:
+								if (flipX && flipY)
+									data.Tiles[i, j].slope(3);
+								else if (flipX)
+									data.Tiles[i, j].slope(1);
+								else if (flipY)
+									data.Tiles[i, j].slope(4);
+								break;
+							case 3:
+								if (flipX && flipY)
+									data.Tiles[i, j].slope(2);
+								else if (flipX)
+									data.Tiles[i, j].slope(4);
+								else if (flipY)
+									data.Tiles[i, j].slope(1);
+								break;
+							case 4:
+								if (flipX && flipY)
+									data.Tiles[i, j].slope(1);
+								else if (flipX)
+									data.Tiles[i, j].slope(3);
+								else if (flipY)
+									data.Tiles[i, j].slope(2);
+								break;
+
 						}
-						else if (tiles[i, j].Item1.slope() == 2)
-						{
-							if (flipX && flipY)
-								tiles[i, j].Item1.slope(3);
-							else if (flipX)
-								tiles[i, j].Item1.slope(1);
-							else if (flipY)
-								tiles[i, j].Item1.slope(4);
-							writer.Write(Tools.TileData(tiles[i, j].Item1));
-						}
-						else if (tiles[i, j].Item1.slope() == 3)
-						{
-							if (flipX && flipY)
-								tiles[i, j].Item1.slope(2);
-							else if (flipX)
-								tiles[i, j].Item1.slope(4);
-							else if (flipY)
-								tiles[i, j].Item1.slope(1);
-							writer.Write(Tools.TileData(tiles[i, j].Item1));
-						}
-						else if (tiles[i, j].Item1.slope() == 4)
-						{
-							if (flipX && flipY)
-								tiles[i, j].Item1.slope(1);
-							else if (flipX)
-								tiles[i, j].Item1.slope(3);
-							else if (flipY)
-								tiles[i, j].Item1.slope(2);
-							writer.Write(Tools.TileData(tiles[i, j].Item1));
-						}
+
+						writer.Write(data.Tiles[i, j]);
 					}
 				}
+
+				WorldSectionData.WriteFooter(writer);
 			}
 
 			plr.SendSuccessMessage("Flipped clipboard.");

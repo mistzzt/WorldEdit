@@ -81,7 +81,7 @@ namespace WorldEdit.Expressions
 				}
 
 				var test = new StringBuilder();
-				while (i < str.Length && (Char.IsLetterOrDigit(str[i]) || str[i] == '!' || str[i] == '='))
+				while (i < str.Length && (char.IsLetterOrDigit(str[i]) || str[i] == '!' || str[i] == '='))
 					test.Append(str[i++]);
 				i--;
 
@@ -148,7 +148,7 @@ namespace WorldEdit.Expressions
 					return test = t => t.liquid > 0;
 				case "t":
 				case "tile":
-					if (String.IsNullOrEmpty(rhs))
+					if (string.IsNullOrEmpty(rhs))
 						return test = t => t.active();
 
 					List<int> tiles = Tools.GetTileID(rhs);
@@ -158,7 +158,7 @@ namespace WorldEdit.Expressions
 				case "tp":
 				case "tilepaint":
 					{
-						if (String.IsNullOrEmpty(rhs))
+						if (string.IsNullOrEmpty(rhs))
 							return test = t => t.active() && t.color() != 0;
 
 						var colors = Tools.GetColorID(rhs);
@@ -168,7 +168,7 @@ namespace WorldEdit.Expressions
 					}
 				case "w":
 				case "wall":
-					if (String.IsNullOrEmpty(rhs))
+					if (string.IsNullOrEmpty(rhs))
 						return test = t => t.wall != 0;
 
 					var walls = Tools.GetTileID(rhs);
@@ -178,7 +178,7 @@ namespace WorldEdit.Expressions
 				case "wp":
 				case "wallpaint":
 					{
-						if (String.IsNullOrEmpty(rhs))
+						if (string.IsNullOrEmpty(rhs))
 							return test = t => t.wall > 0 && t.wallColor() != 0;
 
 						var colors = Tools.GetColorID(rhs);
@@ -214,7 +214,7 @@ namespace WorldEdit.Expressions
 				case "s":
 				case "slope":
 					{
-						if (String.IsNullOrEmpty(rhs))
+						if (string.IsNullOrEmpty(rhs))
 							return test = t => (t.slope() != 0);
 
 						int slope = Tools.GetSlopeID(rhs);
@@ -234,7 +234,7 @@ namespace WorldEdit.Expressions
 
 			try
 			{
-				expression = ParseExpression(ParsePostfix(ParseInfix(String.Join(" ", parameters.Skip(1)))));
+				expression = ParseExpression(ParsePostfix(ParseInfix(string.Join(" ", parameters.Skip(1)))));
 				return true;
 			}
 			catch

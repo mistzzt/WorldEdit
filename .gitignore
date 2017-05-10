@@ -9,3 +9,5 @@
 *.mdb
 *.csproj.user
 .vs/
+
+packages/
