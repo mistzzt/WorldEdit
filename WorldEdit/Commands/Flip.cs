@@ -73,8 +73,6 @@ namespace WorldEdit.Commands
 						writer.Write(data.Tiles[i, j]);
 					}
 				}
-
-				WorldSectionData.WriteFooter(writer);
 			}
 
 			plr.SendSuccessMessage("Flipped clipboard.");

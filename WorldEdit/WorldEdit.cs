@@ -411,7 +411,7 @@ namespace WorldEdit
 				}
 				File.Create(lockFilePath).Close();
 				TShock.Log.ConsoleInfo("WorldEdit doesn't support undo/redo/clipboard files that were saved by plugin below version 1.7.");
-				TShock.Log.ConsoleInfo("These files had been deleted. However, we still support old schematic files (*.dat) and convert them to new format.");
+				TShock.Log.ConsoleInfo("These files had been deleted. However, we still support old schematic files (*.dat)");
 				TShock.Log.ConsoleInfo("Do not delete deteted.lock inside worldedit folder; this message will only show once.");
 			}
 			#endregion
@@ -1240,8 +1240,7 @@ namespace WorldEdit
 
 		private void Schematic(CommandArgs e)
 		{
-			const string schemFileNameFormat = "schematic-{0}.schem";
-			const string schemFileNameFormatOld = "schematic-{0}.dat";
+			const string fileFormat = "schematic-{0}.dat";
 
 			string subCmd = e.Parameters.Count == 0 ? "help" : e.Parameters[0].ToLowerInvariant();
 			switch (subCmd)
@@ -1255,16 +1254,15 @@ namespace WorldEdit
 							return;
 						}
 
-						string old = Path.Combine("worldedit", string.Format(schemFileNameFormatOld, e.Parameters[1]));
-						string path = Path.Combine("worldedit", string.Format(schemFileNameFormat, e.Parameters[1]));
+						string path = Path.Combine("worldedit", string.Format(fileFormat, e.Parameters[1]));
 
-						if (!File.Exists(old) && !File.Exists(path))
+						if (!File.Exists(path))
 						{
 							e.Player.SendErrorMessage("Invalid schematic '{0}'!");
 							return;
 						}
 
-						File.Delete(File.Exists(path) ? path : old);
+						File.Delete(path);
 						e.Player.SendErrorMessage("Deleted schematic '{0}'.", e.Parameters[1]);
 					}
 					return;
@@ -1287,11 +1285,8 @@ namespace WorldEdit
 						if (!PaginationTools.TryParsePageNumber(e.Parameters, 1, e.Player, out pageNumber))
 							return;
 
-						var oldschematics = from s in Directory.EnumerateFiles("worldedit", string.Format(schemFileNameFormatOld, "*"))
+						var schematics = from s in Directory.EnumerateFiles("worldedit", string.Format(fileFormat, "*"))
 											select s.Substring(20, s.Length - 24);
-						var newschematics = from s in Directory.EnumerateFiles("worldedit", string.Format(schemFileNameFormat, "*"))
-											select s.Substring(20, s.Length - 26);
-						var schematics = newschematics.Concat(oldschematics).Distinct();
 
 						PaginationTools.SendPage(e.Player, pageNumber, PaginationTools.BuildLinesFromTerms(schematics),
 							new PaginationTools.Settings
@@ -1310,20 +1305,13 @@ namespace WorldEdit
 							return;
 						}
 
-						var old = Path.Combine("worldedit", string.Format(schemFileNameFormatOld, e.Parameters[1]));
-						var path = Path.Combine("worldedit", string.Format(schemFileNameFormat, e.Parameters[1]));
+						var path = Path.Combine("worldedit", string.Format(fileFormat, e.Parameters[1]));
 
 						var clipboard = Tools.GetClipboardPath(e.Player.User.ID);
 
 						if (File.Exists(path))
 						{
 							File.Copy(path, clipboard, true);
-						}
-						else if (File.Exists(old))
-						{
-							var tiles = Tools.LoadWorldDataOld(old);
-							var data = new WorldSectionData(tiles.GetLength(0), tiles.GetLength(1)) { Tiles = tiles };
-							data.Write(clipboard);
 						}
 						else
 						{
@@ -1358,13 +1346,9 @@ namespace WorldEdit
 							return;
 						}
 
-						var path = Path.Combine("worldedit", string.Format(schemFileNameFormat, e.Parameters[1]));
+						var path = Path.Combine("worldedit", string.Format(fileFormat, e.Parameters[1]));
 
 						File.Copy(clipboard, path, true);
-
-						var old = Path.Combine("worldedit", string.Format(schemFileNameFormatOld, e.Parameters[1]));
-						if (File.Exists(old))
-							File.Delete(old);
 
 						e.Player.SendSuccessMessage("Saved clipboard to schematic '{0}'.", e.Parameters[1]);
 					}

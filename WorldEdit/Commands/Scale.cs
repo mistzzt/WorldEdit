@@ -52,8 +52,6 @@ namespace WorldEdit.Commands
 						r.Clear();
 					}
 				}
-
-				WorldSectionData.WriteFooter(writer);
 			}
 
 			plr.SendSuccessMessage("Scaled clipboard to {0}x.", _scale);

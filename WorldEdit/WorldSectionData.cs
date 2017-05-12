@@ -181,13 +181,6 @@ namespace WorldEdit
 			return writer;
 		}
 
-		public static void WriteFooter(BinaryWriter writer)
-		{
-			writer.Write(0);
-			writer.Write(0);
-			writer.Write(0);
-		}
-
 		public struct ItemFrameData
 		{
 			public int X;

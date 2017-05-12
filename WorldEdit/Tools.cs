@@ -113,6 +113,9 @@ namespace WorldEdit
 						worldData.Tiles[i, j] = reader.ReadTile();
 				}
 
+				if (reader.PeekChar() == -1) // for old version
+					return worldData;
+
 				var signCount = reader.ReadInt32();
 				worldData.Signs = new WorldSectionData.SignData[signCount];
 				for (var i = 0; i < signCount; i++)
@@ -204,32 +207,6 @@ namespace WorldEdit
 		}
 
 		#endregion
-
-		public static Tile[,] LoadWorldDataOld(string path)
-		{
-			// GZipStream is already buffered, but it's much faster to have a 1 MB buffer.
-			using (var reader =
-				new BinaryReader(
-					new BufferedStream(
-						new GZipStream(File.Open(path, FileMode.Open), CompressionMode.Decompress), BUFFER_SIZE)))
-			{
-				reader.ReadInt32();
-				reader.ReadInt32();
-				var width = reader.ReadInt32();
-				var height = reader.ReadInt32();
-				var tile = new Tile[width, height];
-
-				for (var i = 0; i < width; i++)
-				{
-					for (var j = 0; j < height; j++)
-					{
-						tile[i, j] = reader.ReadTile();
-					}
-				}
-
-				return tile;
-			}
-		}
 
 		public static void LoadWorldSection(string path)
 		{

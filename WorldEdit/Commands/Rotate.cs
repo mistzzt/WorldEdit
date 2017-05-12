@@ -119,11 +119,7 @@ namespace WorldEdit.Commands
 					break;
 			}
 
-			if (writer != null)
-			{
-				WorldSectionData.WriteFooter(writer);
-				writer.Close();
-			}
+			writer?.Close();
 
 			plr.SendSuccessMessage("Rotated clipboard {0} degrees.", _degrees);
 		}
