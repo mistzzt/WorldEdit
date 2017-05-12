@@ -89,7 +89,7 @@ namespace WorldEdit
 
 		public static bool HasClipboard(int accountID)
 		{
-			return File.Exists(Path.Combine("worldedit", string.Format("clipboard-{0}.dat", accountID)));
+			return File.Exists(GetClipboardPath(accountID));
 		}
 
 		#region LoadWorldSectionData

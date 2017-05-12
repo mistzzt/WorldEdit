@@ -6,10 +6,10 @@ namespace WorldEdit.Extensions
 	{
 		public static PlayerInfo GetPlayerInfo(this TSPlayer tsplayer)
 		{
-			if (!tsplayer.ContainsData(PlayerInfo.KEY))
-				tsplayer.SetData(PlayerInfo.KEY, new PlayerInfo());
+			if (!tsplayer.ContainsData(PlayerInfo.Key))
+				tsplayer.SetData(PlayerInfo.Key, new PlayerInfo());
 
-			return tsplayer.GetData<PlayerInfo>(PlayerInfo.KEY);
+			return tsplayer.GetData<PlayerInfo>(PlayerInfo.Key);
 		}
 	}
 }
