@@ -229,7 +229,7 @@ namespace WorldEdit
 			{
 				HelpText = "Converts biomes in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.clipboard.copy", Copy, "/copy")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.clipboard.copy", Copy, "/copy", "/c")
 			{
 				HelpText = "Copies the worldedit selection to the clipboard."
 			});
@@ -274,31 +274,31 @@ namespace WorldEdit
 				AllowServer = false,
 				HelpText = "Sets the worldedit selection to a radius around you."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.outline", Outline, "/outline")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.outline", Outline, "/outline", "/ol")
 			{
 				HelpText = "Sets block outline around blocks in area."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.outlinewall", OutlineWall, "/outlinewall")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.outlinewall", OutlineWall, "/outlinewall", "/olw")
 			{
 				HelpText = "Sets wall outline around walls in area."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.paint", Paint, "/paint")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.paint", Paint, "/paint", "/pa")
 			{
 				HelpText = "Paints tiles in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.paintwall", PaintWall, "/paintwall")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.paintwall", PaintWall, "/paintwall", "/paw")
 			{
 				HelpText = "Paints walls in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.clipboard.paste", Paste, "/paste")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.clipboard.paste", Paste, "/paste", "/p")
 			{
 				HelpText = "Pastes the clipboard to the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.point", Point1, "/point1", "/p1")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.point", Point1, "/point1", "p1")
 			{
 				HelpText = "Sets the positions of the worldedit selection's first point."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.point", Point2, "/point2", "/p2")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.point", Point2, "/point2", "p2")
 			{
 				HelpText = "Sets the positions of the worldedit selection's second point."
 			});
@@ -318,7 +318,7 @@ namespace WorldEdit
 			{
 				HelpText = "Rotates the worldedit clipboard."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.schematic", Schematic, "/schematic", "/schem")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.schematic", Schematic, "/schematic", "/schem", "sc")
 			{
 				HelpText = "Manages worldedit schematics."
 			});
@@ -330,15 +330,15 @@ namespace WorldEdit
 			{
 				HelpText = "Sets tiles in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.setgrass", SetGrass, "/setgrass")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.setgrass", SetGrass, "/setgrass", "/sg")
 			{
 				HelpText = "Sets certain grass in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.setwall", SetWall, "/setwall")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.setwall", SetWall, "/setwall", "/swa")
 			{
 				HelpText = "Sets walls in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.setwire", SetWire, "/setwire")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.region.setwire", SetWire, "/setwire", "/swi")
 			{
 				HelpText = "Sets wires in the worldedit selection."
 			});
@@ -354,7 +354,7 @@ namespace WorldEdit
 			{
 				HelpText = "Smooths blocks in the worldedit selection."
 			});
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.inactive", Inactive, "/inactive")
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.selection.inactive", Inactive, "/inactive", "/ia")
 			{
 				HelpText = "Sets the inactive status in the worldedit selection."
 			});
@@ -1001,16 +1001,27 @@ namespace WorldEdit
 					}
 				}
 
-				Expression expression = null;
-				if (e.Parameters.Count > 1)
+				bool mainBlocks = true;
+				int Skip = 1;
+
+				if ((e.Parameters.Count > 1) && ((e.Parameters[1].ToLowerInvariant() == "-f")
+					|| (e.Parameters[1].ToLowerInvariant() == "-file")))
 				{
-					if (!Parser.TryParseTree(e.Parameters.Skip(1), out expression))
+					mainBlocks = false;
+					Skip++;
+				}
+
+				Expression expression = null;
+				if (e.Parameters.Count > Skip)
+				{
+					if (!Parser.TryParseTree(e.Parameters.Skip(Skip), out expression))
 					{
 						e.Player.SendErrorMessage("Invalid expression!");
 						return;
 					}
 				}
-				_commandQueue.Add(new Paste(info.X, info.Y, e.Player, alignment, expression));
+
+				_commandQueue.Add(new Paste(info.X, info.Y, e.Player, alignment, expression, mainBlocks));
 			}
 		}
 

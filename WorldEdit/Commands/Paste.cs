@@ -12,12 +12,14 @@ namespace WorldEdit.Commands
 	{
 		private readonly int alignment;
 		private readonly Expression expression;
+		private readonly bool mainBlocks;
 
-		public Paste(int x, int y, TSPlayer plr, int alignment, Expression expression)
+		public Paste(int x, int y, TSPlayer plr, int alignment, Expression expression, bool mainBlocks)
 			: base(x, y, int.MaxValue, int.MaxValue, plr)
 		{
 			this.alignment = alignment;
 			this.expression = expression;
+			this.mainBlocks = mainBlocks;
 		}
 
 		public override void Execute()
@@ -50,14 +52,14 @@ namespace WorldEdit.Commands
 			{
 				for (var j = y; j <= y2; j++)
 				{
-					if (i < 0 || j < 0 || i >= Main.maxTilesX || j >= Main.maxTilesY ||
-						expression != null && !expression.Evaluate(Main.tile[i, j]))
+					int index1 = i - x;
+					int index2 = j - y;
+
+					if (i < 0 || j < 0 || i >= Main.maxTilesX || j >= Main.maxTilesY || expression != null
+						&& !expression.Evaluate(mainBlocks ? Main.tile[i, j] : data.Tiles[index1, index2]))
 					{
 						continue;
 					}
-
-					var index1 = i - x;
-					var index2 = j - y;
 
 					Main.tile[i, j] = data.Tiles[index1, index2];
 
