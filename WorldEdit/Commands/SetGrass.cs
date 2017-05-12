@@ -1,7 +1,4 @@
-﻿using System;
-using System.Linq;
-using Terraria;
-using Terraria.ID;
+﻿using Terraria;
 using TShockAPI;
 using WorldEdit.Expressions;
 
@@ -15,7 +12,7 @@ namespace WorldEdit.Commands
 		public SetGrass(int x, int y, int x2, int y2, TSPlayer plr, string grass, Expression expression)
 			: base(x, y, x2, y2, plr)
 		{
-			this.expression = expression ?? new TestExpression(new Test(t => true));
+			this.expression = expression ?? new TestExpression(t => true);
 			this.grass = grass;
 		}
 
@@ -32,8 +29,8 @@ namespace WorldEdit.Commands
 
 			Tools.PrepareUndo(x, y, x2, y2, plr);
 
-			WorldEdit.Biomes.TryGetValue(grass, out int[] tiles);
-			ushort Old = ((ushort)tiles[0]), New = ((ushort)tiles[4]);
+			var tiles = WorldEdit.Biomes[grass];
+			ushort dirtType = (ushort)tiles[0], grassType = (ushort)tiles[4];
 
 			int edits = 0;
 			for (int i = x; i <= x2; i++)
@@ -52,9 +49,9 @@ namespace WorldEdit.Commands
 
 					if (XY && !(mXmY && mXpY && pXmY && pXpY && mXY && pXY && XmY && XpY)
 						&& expression.Evaluate(Main.tile[i, j])
-						&& (Main.tile[i, j].type == Old))
+						&& Main.tile[i, j].type == dirtType)
 					{
-						Main.tile[i, j].type = New;
+						Main.tile[i, j].type = grassType;
 						edits++;
 					}
 				}

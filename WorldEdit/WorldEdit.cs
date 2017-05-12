@@ -427,15 +427,14 @@ namespace WorldEdit
 			#region Biomes
 			// Format: dirt, stone, ice, sand, grass, plants, tall plants, vines, thorn
 
-			Biomes.Add("crimson", new[] { 0, 203, 200, 234, 199, -1, -1, 205, 32 });
-			Biomes.Add("flesh", new[] { 0, 203, 200, 234, 199, -1, -1, 205, 32 });
-			Biomes.Add("corruption", new[] { 0, 25, 163, 112, 23, 24, -1, -1, 32 });
-			Biomes.Add("hallow", new[] { 0, 117, 164, 116, 109, 110, 113, 52, -1 });
-			Biomes.Add("jungle", new[] { 59, 1, 161, 53, 60, 61, 74, 62, 69 });
-			Biomes.Add("mushroom", new[] { 59, 1, 161, 53, 70, 71, -1, -1, -1 });
-			Biomes.Add("normal", new[] { 0, 1, 161, 53, 2, 3, 73, 52, -1 });
-			Biomes.Add("forest", new[] { 0, 1, 161, 53, 2, 3, 73, 52, -1 });
-			Biomes.Add("snow", new[] { 147, 161, 161, 53, 147, -1, -1, -1, -1 });
+			Biomes.Add("crimson", new[] { TileID.Dirt, TileID.Crimstone, TileID.FleshIce, TileID.Crimsand, TileID.FleshGrass, -1, -1, TileID.CrimsonVines, TileID.CorruptThorns });
+			Biomes.Add("corruption", new[] { TileID.Dirt, TileID.Ebonstone, TileID.CorruptIce, TileID.Ebonsand, TileID.CorruptGrass, TileID.CorruptPlants, -1, -1, TileID.CorruptThorns });
+			Biomes.Add("hallow", new[] { TileID.Dirt, TileID.Pearlstone, TileID.HallowedIce, TileID.Pearlsand, TileID.HallowedGrass, TileID.HallowedPlants, TileID.HallowedPlants2, TileID.Vines, -1 });
+			Biomes.Add("jungle", new int[] { TileID.Mud, TileID.Stone, TileID.IceBlock, TileID.Sand, TileID.JungleGrass, TileID.JunglePlants, TileID.JunglePlants2, TileID.JungleVines, TileID.JungleThorns });
+			Biomes.Add("mushroom", new[] { TileID.Mud, TileID.Stone, TileID.IceBlock, TileID.Sand, TileID.MushroomGrass, TileID.MushroomPlants, -1, -1, -1 });
+			Biomes.Add("normal", new[] { TileID.Dirt, TileID.Stone, TileID.IceBlock, TileID.Sand, TileID.Grass, TileID.Plants, TileID.Plants2, TileID.Vines, -1 });
+			Biomes.Add("forest", new[] { TileID.Dirt, TileID.Stone, TileID.IceBlock, TileID.Sand, TileID.Grass, TileID.Plants, TileID.Plants2, TileID.Vines, -1 });
+			Biomes.Add("snow", new[] { TileID.SnowBlock, TileID.IceBlock, TileID.IceBlock, TileID.Sand, TileID.SnowBlock, -1, -1, -1, -1 });
 			#endregion
 			#region Colors
 			Colors.Add("blank", 0);

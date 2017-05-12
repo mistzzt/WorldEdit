@@ -1,6 +1,4 @@
-﻿using OTAPI.Tile;
-using Terraria;
-using TShockAPI;
+﻿using TShockAPI;
 
 namespace WorldEdit.Commands
 {
