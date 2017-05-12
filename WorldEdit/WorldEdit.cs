@@ -366,6 +366,10 @@ namespace WorldEdit
 			{
 				HelpText = "Undoes a number of worldedit actions."
 			});
+			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.clipboard.scale", Scale, "/scale")
+			{
+				HelpText = "Scale the clipboard"
+			});
 			#endregion
 			#region Database
 			switch (TShock.Config.StorageType.ToLowerInvariant())
@@ -1213,6 +1217,26 @@ namespace WorldEdit
 				e.Player.SendErrorMessage("Invalid angle '{0}'!", e.Parameters[0]);
 			else
 				CommandQueue.Add(new Rotate(e.Player, degrees));
+		}
+
+		private void Scale(CommandArgs e)
+		{
+			if (e.Parameters.Count != 1)
+			{
+				e.Player.SendErrorMessage("Invalid syntax! Proper syntax: //scale <amount>");
+				return;
+			}
+			if (!Tools.HasClipboard(e.Player.User.ID))
+			{
+				e.Player.SendErrorMessage("Invalid clipboard!");
+				return;
+			}
+			if (!int.TryParse(e.Parameters[0], out int scale))
+			{
+				e.Player.SendErrorMessage("Invalid amount!");
+				return;
+			}
+			CommandQueue.Add(new Scale(e.Player, scale));
 		}
 
 		private void Schematic(CommandArgs e)

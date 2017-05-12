@@ -80,6 +80,7 @@
     <Compile Include="Commands\Paste.cs" />
     <Compile Include="Commands\Redo.cs" />
     <Compile Include="Commands\Rotate.cs" />
+    <Compile Include="Commands\Scale.cs" />
     <Compile Include="Commands\SetGrass.cs" />
     <Compile Include="Commands\SetWall.cs" />
     <Compile Include="Commands\SetWire.cs" />
