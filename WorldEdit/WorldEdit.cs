@@ -1287,10 +1287,10 @@ namespace WorldEdit
 						if (!PaginationTools.TryParsePageNumber(e.Parameters, 1, e.Player, out pageNumber))
 							return;
 
-						var oldschematics = from s in Directory.EnumerateFiles("worldedit", schemFileNameFormatOld)
+						var oldschematics = from s in Directory.EnumerateFiles("worldedit", string.Format(schemFileNameFormatOld, "*"))
 											select s.Substring(20, s.Length - 24);
-						var newschematics = from s in Directory.EnumerateFiles("worldedit", schemFileNameFormat)
-											select s.Substring(24, s.Length - 28);
+						var newschematics = from s in Directory.EnumerateFiles("worldedit", string.Format(schemFileNameFormat, "*"))
+											select s.Substring(20, s.Length - 26);
 						var schematics = newschematics.Concat(oldschematics).Distinct();
 
 						PaginationTools.SendPage(e.Player, pageNumber, PaginationTools.BuildLinesFromTerms(schematics),
