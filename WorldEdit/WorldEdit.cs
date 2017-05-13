@@ -1269,7 +1269,7 @@ namespace WorldEdit
 
 						if (!File.Exists(path))
 						{
-							e.Player.SendErrorMessage("Invalid schematic '{0}'!");
+							e.Player.SendErrorMessage("Invalid schematic '{0}'!", e.Parameters[1]);
 							return;
 						}
 
@@ -1279,10 +1279,10 @@ namespace WorldEdit
 					return;
 				case "help":
 					e.Player.SendSuccessMessage("Schematics Subcommands:");
-					e.Player.SendInfoMessage("//schem delete/del <name>\r\n"
-										   + "//schem list [page]\r\n"
-										   + "//schem load/l <name>\r\n"
-										   + "//schem save/s <name>\r\n");
+					e.Player.SendInfoMessage("/sc delete/del <name>\r\n"
+										   + "/sc list [page]\r\n"
+										   + "/sc load/l <name>\r\n"
+										   + "/sc save/s <name>");
 					return;
 				case "list":
 					{
@@ -1326,7 +1326,7 @@ namespace WorldEdit
 						}
 						else
 						{
-							e.Player.SendErrorMessage("Invalid schematic '{0}'!");
+							e.Player.SendErrorMessage("Invalid schematic '{0}'!", e.Parameters[1]);
 							return;
 						}
 
