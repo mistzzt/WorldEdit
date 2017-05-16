@@ -27,6 +27,7 @@ namespace WorldEdit
 	[ApiVersion(2, 1)]
 	public class WorldEdit : TerrariaPlugin
 	{
+		public const string WorldEditFolderName = "worldedit";
 		public static Dictionary<string, int[]> Biomes = new Dictionary<string, int[]>();
 		public static Dictionary<string, int> Colors = new Dictionary<string, int>();
 		public static IDbConnection Database;
@@ -213,11 +214,17 @@ namespace WorldEdit
 		}
 
 		private void OnInitialize(EventArgs e)
-		{
-			Directory.CreateDirectory("worldedit");
+        {
+            var lockFilePath = Path.Combine(WorldEditFolderName, "deleted.lock");
 
-			#region Commands
-			TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.utils.activate", Activate, "/activate")
+            if (!Directory.Exists(WorldEditFolderName))
+            {
+                Directory.CreateDirectory(WorldEditFolderName);
+                File.Create(lockFilePath).Close();
+			}
+
+            #region Commands
+            TShockAPI.Commands.ChatCommands.Add(new Command("worldedit.utils.activate", Activate, "/activate")
 			{
 				HelpText = "Activates non-working signs, chests or item frames."
 			});
@@ -393,19 +400,18 @@ namespace WorldEdit
 			}
 
 			#region Old Version Support
-			var lockFilePath = Path.Combine("worldedit", "deleted.lock");
 			if (!File.Exists(lockFilePath))
 			{
 				Database.Query("DROP TABLE WorldEdit");
-				foreach (var file in Directory.EnumerateFiles("worldedit", "undo-*.dat"))
+				foreach (var file in Directory.EnumerateFiles(WorldEditFolderName, "undo-*.dat"))
 				{
 					File.Delete(file);
 				}
-				foreach (var file in Directory.EnumerateFiles("worldedit", "redo-*.dat"))
+				foreach (var file in Directory.EnumerateFiles(WorldEditFolderName, "redo-*.dat"))
 				{
 					File.Delete(file);
 				}
-				foreach (var file in Directory.EnumerateFiles("worldedit", "clipboard-*.dat"))
+				foreach (var file in Directory.EnumerateFiles(WorldEditFolderName, "clipboard-*.dat"))
 				{
 					File.Delete(file);
 				}

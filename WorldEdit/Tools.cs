@@ -22,7 +22,7 @@ namespace WorldEdit
 
 		public static string GetClipboardPath(int accountID)
 		{
-			return Path.Combine("worldedit", string.Format("clipboard-{0}.dat", accountID));
+			return Path.Combine(WorldEdit.WorldEditFolderName, string.Format("clipboard-{0}.dat", accountID));
 		}
 		public static bool IsCorrectName(string name)
 		{
